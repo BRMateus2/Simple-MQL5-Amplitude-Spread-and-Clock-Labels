@@ -35,26 +35,26 @@ You should have received a copy of the GNU General Public License along with thi
 #define INPUT input
 #endif
 //---- Indicator Definitions
-const string short_name = "StatsAndClock";
+const string iName = "StatsAndClock";
 //---- Input Parameters
 //---- "Label Settings"
 input group "Label Settings"
-INPUT color text_color = clrYellow; // Text Color
-INPUT ENUM_BASE_CORNER corner = CORNER_RIGHT_UPPER; // Text Corner
-INPUT long font_size = 12; // Font Size
-INPUT string font_name = "DejaVu Sans Mono"; // Font Name (system naming)
-INPUT long distance_x = 0; // X Distance or Horizontal Position Offset
-INPUT long distance_y = 0; // Y Distance or Vertical Position Offset
-INPUT long spacing_y = 3; // Vertical gap between objects
+INPUT color lColor = clrYellow; // Text Color
+INPUT ENUM_BASE_CORNER lCorner = CORNER_RIGHT_UPPER; // Text Corner
+INPUT long lFontSize = 12; // Font Size
+INPUT string lFontName = "DejaVu Sans Mono"; // Font Name (system naming)
+INPUT long oDistX = 0; // X Distance or Horizontal Position Offset
+INPUT long oDistY = 0; // Y Distance or Vertical Position Offset
+INPUT long oSpacingY = 3; // Vertical gap between objects
 //---- "Statistics"
 input group "Statistics"
-INPUT bool show_stats = true; // Show Statistics line?
+INPUT bool oStatsShow = true; // Show Statistics line?
 enum SFormat { // SFormat
     kFirst, // Format Ampl(xA/xB)/(yA/yB) Spr(z) mm:ss - Amplitude/Spread
     kSecond // Format Chg(dA/dB) W([m,M]) Spr(z) mm:ss - Chg/WeekRange/Spread
 };
-INPUT int week_range = 52; // How many weeks should the range contain? Normally 52 weeks
-INPUT SFormat s_format = kFirst; // Amplitude and Spread Stats Format
+INPUT int weekRange = 52; // How many weeks should the range contain? Normally 52 weeks
+INPUT SFormat sFormat = kFirst; // Amplitude and Spread Stats Format
 //---- "Clock"
 input group "Clock"
 enum DateFormat {
@@ -63,20 +63,20 @@ enum DateFormat {
     kTimeDateSeconds, // Format YYYY.MM.DD hh:mm:ss
     kTimeDateMinutes, // Format YYYY.MM.DD hh:mm
 };
-INPUT DateFormat date_format = kTimeDateSeconds; // Date Format
-INPUT bool show_offset = true; // Show UTC Timezone Offset?
-INPUT bool show_dates_same_line = true; // Show both dates on the same line?
+INPUT DateFormat dFormat = kTimeDateSeconds; // Date Format
+INPUT bool dShowOffset = true; // Show UTC Timezone Offset?
+INPUT bool dShowSameLine = true; // Show both dates on the same line?
 //---- "Server Clock"
 input group "Server Clock"
-INPUT bool use_server_date = true; // Use Server Date instead of Local/UTC Date?
+INPUT bool dUseServer = true; // Use Server Date instead of Local/UTC Date?
 //---- "Local Clock"
 input group "Local Clock"
-INPUT bool show_local = true; // Show Local Time Label?
-INPUT bool show_local_as_utc = false; // Use UTC+0 / GMT Time instead of Local Timezone?
+INPUT bool dShowLocal = true; // Show Local Time Label?
+INPUT bool dShowLocalAsUTC = false; // Use UTC+0 / GMT Time instead of Local Timezone?
 //---- Objects
-const string obj_s = "AmplitudeAndSpread"; // Object Stats, used for naming
-const string obj_cs = "ClockServer"; // Object Clock Server, used for naming
-const string obj_cl = "ClockLocal"; // Object Clock Local, used for naming
+const string oStats = "AmplitudeAndSpread"; // Object Stats, used for naming
+const string oCS = "ClockServer"; // Object Clock Server, used for naming
+const string oCL = "ClockLocal"; // Object Clock Local, used for naming
 //---- ChartRedraw() Timer optimization, calls once per second
 datetime last = 0;
 //+------------------------------------------------------------------+
@@ -87,45 +87,45 @@ datetime last = 0;
 //+------------------------------------------------------------------+
 int OnInit()
 {
-    last = TimeCurrent();
-    IndicatorSetString(INDICATOR_SHORTNAME, short_name);
-    ObjectDelete(ChartID(), obj_s);
-    ObjectDelete(ChartID(), obj_cs);
-    ObjectDelete(ChartID(), obj_cl);
-    if(show_stats) {
-        ObjectCreate(ChartID(), obj_s, OBJ_LABEL, ChartWindowFind(ChartID(), short_name), 0, 0.0);
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_CORNER, corner);
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_XDISTANCE, distance_x);
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_YDISTANCE, distance_y);
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_FONTSIZE, font_size);
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_COLOR, text_color);
-        ObjectSetString(ChartID(), obj_s, OBJPROP_FONT, font_name);
-        ObjectSetString(ChartID(), obj_s, OBJPROP_TEXT, obj_s);
+    last = TimeGMT();
+    IndicatorSetString(INDICATOR_SHORTNAME, iName);
+    ObjectDelete(ChartID(), oStats);
+    ObjectDelete(ChartID(), oCS);
+    ObjectDelete(ChartID(), oCL);
+    if(oStatsShow) {
+        ObjectCreate(ChartID(), oStats, OBJ_LABEL, ChartWindowFind(ChartID(), iName), 0, 0.0);
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_CORNER, lCorner);
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_XDISTANCE, oDistX);
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_YDISTANCE, oDistY);
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_FONTSIZE, lFontSize);
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_COLOR, lColor);
+        ObjectSetString(ChartID(), oStats, OBJPROP_FONT, lFontName);
+        ObjectSetString(ChartID(), oStats, OBJPROP_TEXT, oStats);
     }
-    ObjectCreate(ChartID(), obj_cs, OBJ_LABEL, ChartWindowFind(ChartID(), short_name), 0, 0.0);
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_CORNER, corner);
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_XDISTANCE, distance_x);
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_YDISTANCE,  (
-                         (show_stats ? ((font_size + spacing_y) + distance_y) : distance_y)
+    ObjectCreate(ChartID(), oCS, OBJ_LABEL, ChartWindowFind(ChartID(), iName), 0, 0.0);
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_CORNER, lCorner);
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_XDISTANCE, oDistX);
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_YDISTANCE,  (
+                         (oStatsShow ? ((lFontSize + oSpacingY) + oDistY) : oDistY)
                      ));
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_FONTSIZE, font_size);
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_COLOR, text_color);
-    ObjectSetString(ChartID(), obj_cs, OBJPROP_FONT, font_name);
-    ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, obj_cs);
-    if(show_local && !show_dates_same_line) {
-        ObjectCreate(ChartID(), obj_cl, OBJ_LABEL, ChartWindowFind(ChartID(), short_name), 0, 0.0);
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_CORNER, corner);
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_XDISTANCE, distance_x);
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_YDISTANCE, (
-                             (show_stats ? ((2 * (font_size + spacing_y)) + distance_y) : ((font_size + spacing_y) + distance_y))
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_FONTSIZE, lFontSize);
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_COLOR, lColor);
+    ObjectSetString(ChartID(), oCS, OBJPROP_FONT, lFontName);
+    ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, oCS);
+    if(dShowLocal && !dShowSameLine) {
+        ObjectCreate(ChartID(), oCL, OBJ_LABEL, ChartWindowFind(ChartID(), iName), 0, 0.0);
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_CORNER, lCorner);
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_XDISTANCE, oDistX);
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_YDISTANCE, (
+                             (oStatsShow ? ((2 * (lFontSize + oSpacingY)) + oDistY) : ((lFontSize + oSpacingY) + oDistY))
                          ));
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_FONTSIZE, font_size);
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_COLOR, text_color);
-        ObjectSetString(ChartID(), obj_cl, OBJPROP_FONT, font_name);
-        ObjectSetString(ChartID(), obj_cl, OBJPROP_TEXT, obj_cl);
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_FONTSIZE, lFontSize);
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_COLOR, lColor);
+        ObjectSetString(ChartID(), oCL, OBJPROP_FONT, lFontName);
+        ObjectSetString(ChartID(), oCL, OBJPROP_TEXT, oCL);
     }
     ENUM_ANCHOR_POINT anchor = ANCHOR_LEFT_UPPER;
-    switch (corner) {
+    switch (lCorner) {
     case CORNER_LEFT_UPPER:
         anchor = ANCHOR_LEFT_UPPER;
         break;
@@ -139,12 +139,12 @@ int OnInit()
         anchor = ANCHOR_RIGHT_LOWER;
         break;
     }
-    if(show_stats) {
-        ObjectSetInteger(ChartID(), obj_s, OBJPROP_ANCHOR, anchor);
+    if(oStatsShow) {
+        ObjectSetInteger(ChartID(), oStats, OBJPROP_ANCHOR, anchor);
     }
-    ObjectSetInteger(ChartID(), obj_cs, OBJPROP_ANCHOR, anchor);
-    if(show_local && !show_dates_same_line) {
-        ObjectSetInteger(ChartID(), obj_cl, OBJPROP_ANCHOR, anchor);
+    ObjectSetInteger(ChartID(), oCS, OBJPROP_ANCHOR, anchor);
+    if(dShowLocal && !dShowSameLine) {
+        ObjectSetInteger(ChartID(), oCL, OBJPROP_ANCHOR, anchor);
     }
     if(!EventSetMillisecondTimer(1000)) {
         ErrorPrint("!EventSetMillisecondTimer(1000) failure at subscribing to event timer");    // Create Timer Event in seconds (use EventSetMillisecondTimer for higher precision or HFT/High Frequency Trading)
@@ -158,9 +158,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-    ObjectDelete(ChartID(), obj_s);
-    ObjectDelete(ChartID(), obj_cs);
-    ObjectDelete(ChartID(), obj_cl);
+    ObjectDelete(ChartID(), oStats);
+    ObjectDelete(ChartID(), oCS);
+    ObjectDelete(ChartID(), oCL);
     return;
 }
 //+------------------------------------------------------------------+
@@ -168,71 +168,71 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-    if(!show_local && !show_offset) {
-        ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)));
-    } else if(!show_local && show_offset) {
-        ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()));
-    } else if(show_local && show_dates_same_line && (date_format == kTimeSeconds || date_format == kTimeDateSeconds)) {
-        if(!show_local_as_utc && use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeToString(TimeLocal(), TIME_SECONDS));
-        } else if(show_local_as_utc && use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeToString(TimeGMT(), TIME_SECONDS));
-        } else if(!show_local_as_utc && !use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeToString(TimeLocal(), EnumToInt(date_format)));
-        } else if(show_local_as_utc && !use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeToString(TimeGMT(), EnumToInt(date_format)));
-        } else if(!show_local_as_utc && use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), TIME_SECONDS) + " " + TimeGMTOffset(TimeLocal()));
-        } else if(show_local_as_utc && use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), TIME_SECONDS) + " " + TimeGMTOffset(TimeGMT()));
-        } else if(!show_local_as_utc && !use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeLocal()));
-        } else if(show_local_as_utc && !use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeGMT()));
+    if(!dShowLocal && !dShowOffset) {
+        ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)));
+    } else if(!dShowLocal && dShowOffset) {
+        ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()));
+    } else if(dShowLocal && dShowSameLine && (dFormat == kTimeSeconds || dFormat == kTimeDateSeconds)) {
+        if(!dShowLocalAsUTC && dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeToString(TimeLocal(), TIME_SECONDS));
+        } else if(dShowLocalAsUTC && dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeToString(TimeGMT(), TIME_SECONDS));
+        } else if(!dShowLocalAsUTC && !dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeToString(TimeLocal(), EnumToInt(dFormat)));
+        } else if(dShowLocalAsUTC && !dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeToString(TimeGMT(), EnumToInt(dFormat)));
+        } else if(!dShowLocalAsUTC && dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), TIME_SECONDS) + " " + TimeGMTOffset(TimeLocal()));
+        } else if(dShowLocalAsUTC && dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), TIME_SECONDS) + " " + TimeGMTOffset(TimeGMT()));
+        } else if(!dShowLocalAsUTC && !dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeLocal()));
+        } else if(dShowLocalAsUTC && !dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_SECONDS) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeGMT()));
         } else {
-            ErrorPrint("untreated condition with show_local: \"" + (string) show_local + "\" " + "show_offset: \"" + (string) show_offset + "\" " + "show_dates_same_line: \"" + (string) show_dates_same_line + "\" " + "date_format: \"" + EnumToString(date_format) + "\" " + "show_local_as_utc: \"" + (string) show_local_as_utc + "\" " + "use_server_date: \"" + (string) use_server_date + "\" " + "\"");
+            ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
         }
-    } else if(show_local && show_dates_same_line && (date_format == kTimeMinutes || date_format == kTimeDateMinutes)) {
-        if(!show_local_as_utc && use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeToString(TimeLocal(), TIME_MINUTES));
-        } else if(show_local_as_utc && use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeToString(TimeGMT(), TIME_MINUTES));
-        } else if(!show_local_as_utc && !use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeToString(TimeLocal(), EnumToInt(date_format)));
-        } else if(show_local_as_utc && !use_server_date && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeToString(TimeGMT(), EnumToInt(date_format)));
-        } else if(!show_local_as_utc && use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), TIME_MINUTES) + " " + TimeGMTOffset(TimeLocal()));
-        } else if(show_local_as_utc && use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), TIME_MINUTES) + " " + TimeGMTOffset(TimeGMT()));
-        } else if(!show_local_as_utc && !use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeLocal()));
-        } else if(show_local_as_utc && !use_server_date && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeGMT()));
+    } else if(dShowLocal && dShowSameLine && (dFormat == kTimeMinutes || dFormat == kTimeDateMinutes)) {
+        if(!dShowLocalAsUTC && dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeToString(TimeLocal(), TIME_MINUTES));
+        } else if(dShowLocalAsUTC && dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeToString(TimeGMT(), TIME_MINUTES));
+        } else if(!dShowLocalAsUTC && !dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeToString(TimeLocal(), EnumToInt(dFormat)));
+        } else if(dShowLocalAsUTC && !dUseServer && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeToString(TimeGMT(), EnumToInt(dFormat)));
+        } else if(!dShowLocalAsUTC && dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), TIME_MINUTES) + " " + TimeGMTOffset(TimeLocal()));
+        } else if(dShowLocalAsUTC && dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), TIME_MINUTES) + " " + TimeGMTOffset(TimeGMT()));
+        } else if(!dShowLocalAsUTC && !dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeLocal(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeLocal()));
+        } else if(dShowLocalAsUTC && !dUseServer && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), TIME_MINUTES) + " " + TimeGMTOffset(TimeTradeServer()) + " " + TimeToString(TimeGMT(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeGMT()));
         } else {
-            ErrorPrint("untreated condition with show_local: \"" + (string) show_local + "\" " + "show_offset: \"" + (string) show_offset + "\" " + "show_dates_same_line: \"" + (string) show_dates_same_line + "\" " + "date_format: \"" + EnumToString(date_format) + "\" " + "show_local_as_utc: \"" + (string) show_local_as_utc + "\" " + "use_server_date: \"" + (string) use_server_date + "\" " + "\"");
+            ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
         }
-    } else if(show_local && !show_dates_same_line) {
-        if(!show_local_as_utc && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)));
-            ObjectSetString(ChartID(), obj_cl, OBJPROP_TEXT, TimeToString(TimeLocal(), EnumToInt(date_format)));
-        } else if(!show_local_as_utc && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()));
-            ObjectSetString(ChartID(), obj_cl, OBJPROP_TEXT, TimeToString(TimeLocal(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeLocal()));
-        } else if (show_local_as_utc && !show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)));
-            ObjectSetString(ChartID(), obj_cl, OBJPROP_TEXT, TimeToString(TimeGMT(), EnumToInt(date_format)));
-        } else if (show_local_as_utc && show_offset) {
-            ObjectSetString(ChartID(), obj_cs, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeTradeServer()));
-            ObjectSetString(ChartID(), obj_cl, OBJPROP_TEXT, TimeToString(TimeGMT(), EnumToInt(date_format)) + " " + TimeGMTOffset(TimeGMT()));
+    } else if(dShowLocal && !dShowSameLine) {
+        if(!dShowLocalAsUTC && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)));
+            ObjectSetString(ChartID(), oCL, OBJPROP_TEXT, TimeToString(TimeLocal(), EnumToInt(dFormat)));
+        } else if(!dShowLocalAsUTC && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()));
+            ObjectSetString(ChartID(), oCL, OBJPROP_TEXT, TimeToString(TimeLocal(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeLocal()));
+        } else if (dShowLocalAsUTC && !dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)));
+            ObjectSetString(ChartID(), oCL, OBJPROP_TEXT, TimeToString(TimeGMT(), EnumToInt(dFormat)));
+        } else if (dShowLocalAsUTC && dShowOffset) {
+            ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeTradeServer()));
+            ObjectSetString(ChartID(), oCL, OBJPROP_TEXT, TimeToString(TimeGMT(), EnumToInt(dFormat)) + " " + TimeGMTOffset(TimeGMT()));
         } else {
-            ErrorPrint("untreated condition with show_local: \"" + (string) show_local + "\" " + "show_offset: \"" + (string) show_offset + "\" " + "show_dates_same_line: \"" + (string) show_dates_same_line + "\" " + "date_format: \"" + EnumToString(date_format) + "\" " + "show_local_as_utc: \"" + (string) show_local_as_utc + "\" " + "use_server_date: \"" + (string) use_server_date + "\" " + "\"");
+            ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
         }
     } else {
-        ErrorPrint("untreated condition with show_local: \"" + (string) show_local + "\" " + "show_offset: \"" + (string) show_offset + "\" " + "show_dates_same_line: \"" + (string) show_dates_same_line + "\" " + "date_format: \"" + EnumToString(date_format) + "\" " + "show_local_as_utc: \"" + (string) show_local_as_utc + "\" " + "use_server_date: \"" + (string) use_server_date + "\" " + "\"");
+        ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
     }
-    if(last < TimeCurrent()) {
-        last = TimeCurrent();
+    if(last < TimeGMT()) {
+        last = TimeGMT();
         ChartRedraw();
     }
     return;
@@ -251,25 +251,25 @@ int OnCalculate(const int rates_total,
                 const long& volume[],
                 const int& spread[])
 {
-    if(!show_stats || (rates_total <= 1)) { // No need to calculate if the data is less than the minimum operational period, or show_stats is false - it is returned as 0, because if we return rates_total, then the terminal interprets that the indicator has valid data
+    if(!oStatsShow || (rates_total <= 1)) { // No need to calculate if the data is less than the minimum operational period, or oStatsShow is false - it is returned as 0, because if we return rates_total, then the terminal interprets that the indicator has valid data
         return 0;
     }
-    last = TimeCurrent();
+    last = TimeGMT();
     datetime m = ((time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()) < 0) ? 0 : (time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent());
     datetime s = m % 60;
     m = (m - s) / 60;
-    if(s_format == kFirst) {
-        ObjectSetString(ChartID(), obj_s, OBJPROP_TEXT,
+    if(sFormat == kFirst) {
+        ObjectSetString(ChartID(), oStats, OBJPROP_TEXT,
                         "Ampl(" + DoubleToString(high[rates_total - 2] - low[rates_total - 2], Digits()) + "/" + DoubleToString(high[rates_total - 1] - low[rates_total - 1], Digits()) + ")" +
                         "/D1(" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 1) - iLow(Symbol(), PERIOD_D1, 1)), Digits()) + "/" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 0) - iLow(Symbol(), PERIOD_D1, 0)), Digits()) + ")" +
                         " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
                        );
-    } else if(s_format == kSecond) {
-        ObjectSetString(ChartID(), obj_s, OBJPROP_TEXT,
+    } else if(sFormat == kSecond) {
+        ObjectSetString(ChartID(), oStats, OBJPROP_TEXT,
                         "Chg(" + DoubleToString((iClose(Symbol(), PERIOD_D1, 2) ? ((iClose(Symbol(), PERIOD_D1, 1) * 100.0 / iClose(Symbol(), PERIOD_D1, 2)) - 100.0) : 0.0), 2) + "%/" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
                         DoubleToString((iClose(Symbol(), PERIOD_D1, 1) ? ((iClose(Symbol(), PERIOD_D1, 0) * 100.0 / iClose(Symbol(), PERIOD_D1, 1)) - 100.0) : 0.0), 2) + "%)" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
-                        " W" + IntegerToString(week_range) + "[" + DoubleToString(iLow(Symbol(), PERIOD_W1, iLowest(Symbol(), PERIOD_W1, MODE_LOW, week_range, 0)), Digits()) +
-                        ", " + DoubleToString(iHigh(Symbol(), PERIOD_W1, iHighest(Symbol(), PERIOD_W1, MODE_HIGH, week_range, 0)), Digits()) + "]" +
+                        " W" + IntegerToString(weekRange) + "[" + DoubleToString(iLow(Symbol(), PERIOD_W1, iLowest(Symbol(), PERIOD_W1, MODE_LOW, weekRange, 0)), Digits()) +
+                        ", " + DoubleToString(iHigh(Symbol(), PERIOD_W1, iHighest(Symbol(), PERIOD_W1, MODE_HIGH, weekRange, 0)), Digits()) + "]" +
                         " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
                        );
     } else {
