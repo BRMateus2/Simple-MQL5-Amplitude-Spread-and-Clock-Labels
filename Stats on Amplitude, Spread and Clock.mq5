@@ -23,29 +23,29 @@ You should have received a copy of the GNU General Public License along with thi
 #property description "This simple indicator is just a statistical label showing Last and Current Candle Amplitude (MinMax), Last and Current Day Amplitude, Current Tick Amplitude and Time Remaining for next Candle.\n"
 #property description "It also shows Server Time (Market Watch) and Local PC Time so you can focus more on the graph and adapt to market hours.\n"
 #property description "You can get the source code at \n\thttps://github.com/BRMateus2/Simple-MQL5-Amplitude-Spread-and-Clock-Labels/"
-#property version "1.03"
+#property version "1.04"
 #property strict
 #property indicator_chart_window
 #property indicator_buffers 0
 #property indicator_plots 0
 //---- Definitions
-#define ErrorPrint(D_error) Print("ERROR: " + D_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
+#define ErrorPrint(Dp_error) Print("ERROR: " + Dp_error + " at \"" + __FUNCTION__ + ":" + IntegerToString(__LINE__) + "\", last internal error: " + IntegerToString(GetLastError()) + " (" + __FILE__ + ")"); ResetLastError(); DebugBreak(); // It should be noted that the GetLastError() function doesn't zero the _LastError variable. Usually the ResetLastError() function is called before calling a function, after which an error appearance is checked.
 //#define INPUT const
 #ifndef INPUT
 #define INPUT input
 #endif
 //---- Indicator Definitions
-string short_name = "StatsAndClock";
+const string short_name = "StatsAndClock";
 //---- Input Parameters
 //---- "Label Settings"
 input group "Label Settings"
 INPUT color text_color = clrYellow; // Text Color
 INPUT ENUM_BASE_CORNER corner = CORNER_RIGHT_UPPER; // Text Corner
-INPUT int font_size = 12; // Font Size
+INPUT long font_size = 12; // Font Size
 INPUT string font_name = "DejaVu Sans Mono"; // Font Name (system naming)
-INPUT int distance_x = 0; // X Distance or Horizontal Position Offset
-INPUT int distance_y = 0; // Y Distance or Vertical Position Offset
-INPUT int spacing_y = 3; // Vertical gap between objects
+INPUT long distance_x = 0; // X Distance or Horizontal Position Offset
+INPUT long distance_y = 0; // Y Distance or Vertical Position Offset
+INPUT long spacing_y = 3; // Vertical gap between objects
 //---- "Statistics"
 input group "Statistics"
 INPUT bool show_stats = true; // Show Statistics line?
@@ -74,10 +74,10 @@ input group "Local Clock"
 INPUT bool show_local = true; // Show Local Time Label?
 INPUT bool show_local_as_utc = false; // Use UTC+0 / GMT Time instead of Local Timezone?
 //---- Objects
-string obj_s = "AmplitudeAndSpread"; // Object Stats, used for naming
-string obj_cs = "ClockServer"; // Object Clock Server, used for naming
-string obj_cl = "ClockLocal"; // Object Clock Local, used for naming
-//---- ChartRedraw() Timer
+const string obj_s = "AmplitudeAndSpread"; // Object Stats, used for naming
+const string obj_cs = "ClockServer"; // Object Clock Server, used for naming
+const string obj_cl = "ClockLocal"; // Object Clock Local, used for naming
+//---- ChartRedraw() Timer optimization, calls once per second
 datetime last = 0;
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
@@ -87,11 +87,11 @@ datetime last = 0;
 //+------------------------------------------------------------------+
 int OnInit()
 {
+    last = TimeCurrent();
     IndicatorSetString(INDICATOR_SHORTNAME, short_name);
     ObjectDelete(ChartID(), obj_s);
     ObjectDelete(ChartID(), obj_cs);
     ObjectDelete(ChartID(), obj_cl);
-//Print("short_name: " + short_name + " ChartID(): " + ChartID() + " ChartWindowFind(ChartID(), short_name): " + ChartWindowFind(ChartID(), short_name));
     if(show_stats) {
         ObjectCreate(ChartID(), obj_s, OBJ_LABEL, ChartWindowFind(ChartID(), short_name), 0, 0.0);
         ObjectSetInteger(ChartID(), obj_s, OBJPROP_CORNER, corner);
@@ -258,21 +258,11 @@ int OnCalculate(const int rates_total,
     datetime m = ((time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()) < 0) ? 0 : (time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent());
     datetime s = m % 60;
     m = (m - s) / 60;
-    int spr = spread[rates_total - 1];
-    string _sp, _m, _s;
-    if (spr < 10) _sp = "...";
-    else if (spr < 100) _sp = "..";
-    else if (spr < 1000) _sp = ".";
-    else _sp = "";
-    if (m < 10) _m = "0";
-    else if (m < 0) m = 0;
-    if (s < 10) _s = "0";
-    else if (s < 0) s = 0;
     if(s_format == kFirst) {
         ObjectSetString(ChartID(), obj_s, OBJPROP_TEXT,
                         "Ampl(" + DoubleToString(high[rates_total - 2] - low[rates_total - 2], Digits()) + "/" + DoubleToString(high[rates_total - 1] - low[rates_total - 1], Digits()) + ")" +
                         "/D1(" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 1) - iLow(Symbol(), PERIOD_D1, 1)), Digits()) + "/" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 0) - iLow(Symbol(), PERIOD_D1, 0)), Digits()) + ")" +
-                        " Spr(" + IntegerToString(spr) + _sp + ") " + _m + IntegerToString(m) + ":" + _s + IntegerToString(s)
+                        " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
                        );
     } else if(s_format == kSecond) {
         ObjectSetString(ChartID(), obj_s, OBJPROP_TEXT,
@@ -280,7 +270,7 @@ int OnCalculate(const int rates_total,
                         DoubleToString((iClose(Symbol(), PERIOD_D1, 1) ? ((iClose(Symbol(), PERIOD_D1, 0) * 100.0 / iClose(Symbol(), PERIOD_D1, 1)) - 100.0) : 0.0), 2) + "%)" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
                         " W" + IntegerToString(week_range) + "[" + DoubleToString(iLow(Symbol(), PERIOD_W1, iLowest(Symbol(), PERIOD_W1, MODE_LOW, week_range, 0)), Digits()) +
                         ", " + DoubleToString(iHigh(Symbol(), PERIOD_W1, iHighest(Symbol(), PERIOD_W1, MODE_HIGH, week_range, 0)), Digits()) + "]" +
-                        " Spr(" + IntegerToString(spr) + _sp + ") " + _m + IntegerToString(m) + ":" + _s + IntegerToString(s)
+                        " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
                        );
     } else {
         ErrorPrint("not implemented");
