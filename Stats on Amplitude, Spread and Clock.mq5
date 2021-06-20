@@ -23,7 +23,7 @@ You should have received a copy of the GNU General Public License along with thi
 #property description "This simple indicator is just a statistical label showing Last and Current Candle Amplitude (MinMax), Last and Current Day Amplitude, Current Tick Amplitude and Time Remaining for next Candle.\n"
 #property description "It also shows Server Time (Market Watch) and Local PC Time so you can focus more on the graph and adapt to market hours.\n"
 #property description "You can get the source code at \n\thttps://github.com/BRMateus2/Simple-MQL5-Amplitude-Spread-and-Clock-Labels/"
-#property version "1.04"
+#property version "1.05"
 #property strict
 #property indicator_chart_window
 #property indicator_buffers 0
@@ -161,6 +161,7 @@ void OnDeinit(const int reason)
     ObjectDelete(ChartID(), oStats);
     ObjectDelete(ChartID(), oCS);
     ObjectDelete(ChartID(), oCL);
+    EventKillTimer();
     return;
 }
 //+------------------------------------------------------------------+
@@ -168,6 +169,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+// Issue: Sometimes IsStopped() is set, but the platform still calls for the OnTimer():
+//  ERROR: ChartGetInteger(ChartID(), CHART_WIDTH_IN_PIXELS, ChartWindowFind(ChartID(), iName), chartSizeXTemp) at "OnTimer:156", last internal error: 4022 (Mini Charts.mq5)
+//  This check attempts to fix that issue
+    if(IsStopped()) {
+        return;
+    }
+// This is a mess, becuz there are more than 7 booleans and variations of formatting - but it is highly compiler friendly anyway (if the compiler knows about conditional graph optimization)
     if(!dShowLocal && !dShowOffset) {
         ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString(TimeTradeServer(), EnumToInt(dFormat)));
     } else if(!dShowLocal && dShowOffset) {
@@ -232,51 +240,82 @@ void OnTimer()
         ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
     }
     if(last < TimeGMT()) {
-        last = TimeGMT();
-        ChartRedraw();
+        statsUpdate(); // Has last = TimeGMT();
+        ChartRedraw(); // After OnTimer() returns, the platform does not call ChartRedraw(), so we have to call here
     }
     return;
 }
 //+------------------------------------------------------------------+
 // Calculation function
+// Issue: Week Range is not updated on a closed market, when opening the platform from fresh boot, because iLow() and iHigh() return wrong data (0.0) - this is one of the issues with MT5 parallel loading of background chart data (I love parallelism, but only when I have control of it, or atleast know its state).
+//  Fixed by: making statsUpdate() independent and called at onTimer()
 //+------------------------------------------------------------------+
-int OnCalculate(const int rates_total,
-                const int prev_calculated,
-                const datetime& time[],
-                const double& open[],
-                const double& high[],
-                const double& low[],
-                const double& close[],
-                const long& tick_volume[],
-                const long& volume[],
-                const int& spread[])
+int OnCalculate(
+    const int        rates_total,
+    const int        prev_calculated,
+    const int        begin,
+    const double&    price[])
+
 {
-    if(!oStatsShow || (rates_total <= 1)) { // No need to calculate if the data is less than the minimum operational period, or oStatsShow is false - it is returned as 0, because if we return rates_total, then the terminal interprets that the indicator has valid data
+    if(!oStatsShow || (rates_total <= 2)) { // No need to calculate if the data is less than the minimum operational period, or oStatsShow is false - it is returned as 0, because we want the terminal to interpret that we still need to calculate (performance cost is likely unmensurable)
         return 0;
     }
+    statsUpdate();
+//ChartRedraw(); // Performance loss is HUGE on every Tick - also, after OnCalculate is returned (such event called only on a Tick, calculation), the platform itself executes a ChartRedraw() and processes the object queue - doing a ChartRedraw() here is just a waste of CPU cycles
+    return rates_total; // Calculations are done and valid
+}
+//+------------------------------------------------------------------+
+//
+//+------------------------------------------------------------------+
+void statsUpdate()
+{
     last = TimeGMT();
-    datetime m = ((time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()) < 0) ? 0 : (time[rates_total - 1] + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent());
+    datetime m = ((iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()) < 0) ? 0 : (iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent());
     datetime s = m % 60;
     m = (m - s) / 60;
     if(sFormat == kFirst) {
         ObjectSetString(ChartID(), oStats, OBJPROP_TEXT,
-                        "Ampl(" + DoubleToString(high[rates_total - 2] - low[rates_total - 2], Digits()) + "/" + DoubleToString(high[rates_total - 1] - low[rates_total - 1], Digits()) + ")" +
-                        "/D1(" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 1) - iLow(Symbol(), PERIOD_D1, 1)), Digits()) + "/" + DoubleToString((iHigh(Symbol(), PERIOD_D1, 0) - iLow(Symbol(), PERIOD_D1, 0)), Digits()) + ")" +
-                        " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
+                        "Ampl(" +
+                        DoubleToString(iHigh(Symbol(), PERIOD_CURRENT, 1) - iLow(Symbol(), PERIOD_CURRENT, 1), Digits()) +
+                        "/" +
+                        DoubleToString(iHigh(Symbol(), PERIOD_CURRENT, 0) - iLow(Symbol(), PERIOD_CURRENT, 0), Digits()) +
+                        ")/D1(" +
+                        DoubleToString((iHigh(Symbol(), PERIOD_D1, 1) - iLow(Symbol(), PERIOD_D1, 1)), Digits()) +
+                        "/" +
+                        DoubleToString((iHigh(Symbol(), PERIOD_D1, 0) - iLow(Symbol(), PERIOD_D1, 0)), Digits()) +
+                        ") Spr(" +
+                        IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) +
+                        (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") +
+                        ") " +
+                        (m < 10 ? "0" : "") +
+                        IntegerToString((m < 0 ? 0 : m)) +
+                        ":" +
+                        (s < 10 ? "0" : "") +
+                        IntegerToString((s < 0 ? 0 : s))
                        );
     } else if(sFormat == kSecond) {
         ObjectSetString(ChartID(), oStats, OBJPROP_TEXT,
-                        "Chg(" + DoubleToString((iClose(Symbol(), PERIOD_D1, 2) ? ((iClose(Symbol(), PERIOD_D1, 1) * 100.0 / iClose(Symbol(), PERIOD_D1, 2)) - 100.0) : 0.0), 2) + "%/" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
-                        DoubleToString((iClose(Symbol(), PERIOD_D1, 1) ? ((iClose(Symbol(), PERIOD_D1, 0) * 100.0 / iClose(Symbol(), PERIOD_D1, 1)) - 100.0) : 0.0), 2) + "%)" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
-                        " W" + IntegerToString(weekRange) + "[" + DoubleToString(iLow(Symbol(), PERIOD_W1, iLowest(Symbol(), PERIOD_W1, MODE_LOW, weekRange, 0)), Digits()) +
-                        ", " + DoubleToString(iHigh(Symbol(), PERIOD_W1, iHighest(Symbol(), PERIOD_W1, MODE_HIGH, weekRange, 0)), Digits()) + "]" +
-                        " Spr(" + IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) + (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") + ") " + (m < 10 ? "0" : "") + IntegerToString((m < 0 ? 0 : m)) + ":" + (s < 10 ? "0" : "") + IntegerToString((s < 0 ? 0 : s))
+                        "Chg(" +
+                        DoubleToString((iClose(Symbol(), PERIOD_D1, 2) ? ((iClose(Symbol(), PERIOD_D1, 1) * 100.0 / iClose(Symbol(), PERIOD_D1, 2)) - 100.0) : 0.0), 2) + "%/" + /* Check for Division by Zero, skips calculation if true - unfortunately MQL5 does not follow IEEE 754 Standards, which enforces no error at "zero divide in", such case of 0.0/0.0 should have resulted in NaN and happens because of the platform asynchronous nature of loading different timeframes than the current */
+                        DoubleToString((iClose(Symbol(), PERIOD_D1, 1) ? ((iClose(Symbol(), PERIOD_D1, 0) * 100.0 / iClose(Symbol(), PERIOD_D1, 1)) - 100.0) : 0.0), 2) +
+                        "%) W" +
+                        IntegerToString(weekRange) + "[" + DoubleToString(iLow(Symbol(), PERIOD_W1, iLowest(Symbol(), PERIOD_W1, MODE_LOW, weekRange, 0)), Digits()) +
+                        ", " +
+                        DoubleToString(iHigh(Symbol(), PERIOD_W1, iHighest(Symbol(), PERIOD_W1, MODE_HIGH, weekRange, 0)), Digits()) +
+                        "] Spr(" +
+                        IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) +
+                        (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") +
+                        ") " +
+                        (m < 10 ? "0" : "") +
+                        IntegerToString((m < 0 ? 0 : m)) +
+                        ":" +
+                        (s < 10 ? "0" : "") +
+                        IntegerToString((s < 0 ? 0 : s))
                        );
     } else {
         ErrorPrint("not implemented");
     }
-//ChartRedraw(); // Performance loss is HUGE on every Tick - also, after OnCalculate is returned (such event called only on a Tick, calculation), the platform itself executes a ChartRedraw() and processes the object queue - doing a ChartRedraw() here is just a waste of CPU cycles
-    return rates_total; // Calculations are done and valid
+    return;
 }
 //+------------------------------------------------------------------+
 // TODO improve function to ignore 1s desync
