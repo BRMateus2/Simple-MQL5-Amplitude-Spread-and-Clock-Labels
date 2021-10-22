@@ -24,7 +24,7 @@ You should have received a copy of the GNU General Public License along with thi
 #property description "It also shows Server Time (Market Watch) and Local PC Time so you can focus more on the graph and adapt to market hours.\n"
 #property description "You can get the source code at \n\thttps://github.com/BRMateus2/Simple-MQL5-Amplitude-Spread-and-Clock-Labels/"
 #property version "1.07"
-#property strict
+#property fpfast
 #property indicator_chart_window
 #property indicator_buffers 0
 #property indicator_plots 0
@@ -59,17 +59,17 @@ enum SFormat { // SFormat
 };
 INPUT int weekRange = 52; // How many weeks should the range contain? Normally 52 weeks
 INPUT SFormat sFormat = kSFormatSecond; // Amplitude and Spread Stats Format
-INPUT bool oStatsShowMktClosed = true; // If there is no new ticks for 5m, show "Closed"/"Disconnected"?
-int oStatsShowMktClosedTimer = 60; // Inactivity timer, which if there are no new quotes, will show as "Mkt Closed"
+INPUT bool oStatsShowMktClosed = true; // If there is no new ticks, show "Closed"/"Disconnected"?
+INPUT int oStatsShowMktClosedTimer = 60; // Inactivity timer in seconds, for "Closed"/"Disconnected"
 //---- "Clock"
 input group "Clock"
 enum DateFormat {
-    kTimeSeconds, // Format hh:mm:ss
-    kTimeMinutes, // Format hh:mm
-    kTimeDateSeconds, // Format YYYY.MM.DD hh:mm:ss
-    kTimeDateMinutes, // Format YYYY.MM.DD hh:mm
+    kDateFormatSeconds, // Format hh:mm:ss
+    kDateFormatMinutes, // Format hh:mm
+    kDateFormatDateSeconds, // Format YYYY.MM.DD hh:mm:ss
+    kDateFormatDateMinutes, // Format YYYY.MM.DD hh:mm
 };
-INPUT DateFormat dFormat = kTimeDateSeconds; // Date Format
+INPUT DateFormat dFormat = kDateFormatDateSeconds; // Date Format
 INPUT bool dShowOffset = true; // Show UTC Timezone Offset?
 INPUT bool dShowSameLine = true; // Show both dates on the same line?
 //---- "Server Clock"
@@ -88,9 +88,9 @@ INPUT int dLocalOffset = 0; // Offset in seconds
 //INPUT bool enableAlertMkt = true; // Enable Market Open and Market Close Alerts
 //bool enableAlertMktOpen = false; // Auxiliary
 //---- Objects
-const string oStats = "AmplitudeAndSpread"; // Object Stats, used for naming
-const string oCS = "ClockServer"; // Object Clock Server, used for naming
-const string oCL = "ClockLocal"; // Object Clock Local, used for naming
+const string oStats = "MTCAmplitudeAndSpread"; // Object Stats, used for naming
+const string oCS = "MTCServer"; // Object Clock Server, used for naming
+const string oCL = "MTCLocal"; // Object Clock Local, used for naming
 //---- OnTimer() statsUpdate() optimization, calls once per second, if for some reason the Stats object was missing data
 datetime last = 0;
 //---- Special oCSLatencyAppend, not guaranteed to average correctly if GetMicrosecondCount() returns 0
@@ -107,14 +107,13 @@ static ulong getMicrosecondCountMean = 0;
 //+------------------------------------------------------------------+
 int OnInit()
 {
+    // Issue: When switching Timeframes too fast, Queued ObjectDelete() is called before or after OnTick() from the Object Event Queue, after ObjectCreate() from OnInit(), deleting the object
+    //  Fix: unknown
     last = TimeGMT();
     getMicrosecondCountLast = GetMicrosecondCount();
     // Indicator Subwindow Short Name
     IndicatorSetString(INDICATOR_SHORTNAME, iName);
     // Treat Objects
-    ObjectDelete(ChartID(), oStats);
-    ObjectDelete(ChartID(), oCS);
-    ObjectDelete(ChartID(), oCL);
     if(oStatsShow) {
         if(!ObjectCreate(ChartID(), oStats, OBJ_LABEL, ChartWindowFind(ChartID(), iName), 0, 0.0)) {
             ErrorPrint("Object creation with ChartID() " + IntegerToString(ChartID()) + " at window " + IntegerToString(ChartWindowFind(ChartID(), iName)));
@@ -210,7 +209,7 @@ void OnTimer()
         ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString((TimeTradeServer() + dServerOffset), EnumToInt(dFormat)));
     } else if(!dShowLocal && dShowOffset) {
         ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString((TimeTradeServer() + dServerOffset), EnumToInt(dFormat)) + " " + TimeGMTOffset((TimeTradeServer() + dServerOffset)));
-    } else if(dShowLocal && dShowSameLine && (dFormat == kTimeSeconds || dFormat == kTimeDateSeconds)) {
+    } else if(dShowLocal && dShowSameLine && (dFormat == kDateFormatSeconds || dFormat == kDateFormatDateSeconds)) {
         if(!dShowLocalAsUTC && dUseServer && !dShowOffset) {
             ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString((TimeTradeServer() + dServerOffset), EnumToInt(dFormat)) + " " + TimeToString((TimeLocal() + dLocalOffset), TIME_SECONDS));
         } else if(dShowLocalAsUTC && dUseServer && !dShowOffset) {
@@ -230,7 +229,7 @@ void OnTimer()
         } else {
             ErrorPrint("untreated condition with dShowLocal: \"" + (string) dShowLocal + "\" " + "dShowOffset: \"" + (string) dShowOffset + "\" " + "dShowSameLine: \"" + (string) dShowSameLine + "\" " + "dFormat: \"" + EnumToString(dFormat) + "\" " + "dShowLocalAsUTC: \"" + (string) dShowLocalAsUTC + "\" " + "dUseServer: \"" + (string) dUseServer + "\" " + "\"");
         }
-    } else if(dShowLocal && dShowSameLine && (dFormat == kTimeMinutes || dFormat == kTimeDateMinutes)) {
+    } else if(dShowLocal && dShowSameLine && (dFormat == kDateFormatMinutes || dFormat == kDateFormatDateMinutes)) {
         if(!dShowLocalAsUTC && dUseServer && !dShowOffset) {
             ObjectSetString(ChartID(), oCS, OBJPROP_TEXT, TimeToString((TimeTradeServer() + dServerOffset), EnumToInt(dFormat)) + " " + TimeToString((TimeLocal() + dLocalOffset), TIME_MINUTES));
         } else if(dShowLocalAsUTC && dUseServer && !dShowOffset) {
@@ -274,7 +273,7 @@ void OnTimer()
     }
     if(oCSLatencyAppend) { // Special oCSLatencyAppend, not guaranteed to average correctly if GetMicrosecondCount() returns 0
         // Calculate latency of the last 20 calls to OnTimer() and show as a tooltip and also append to the text
-        // The code is highly optimized (atleast the comparisons), that's the reason for > in place of >= - normally there is no reason at all to optimize, but I can't output the code in Assembly to look at, neither this code can be benchmarked usefully
+        // The code is highly optimized (at least the comparisons), that's the reason for > in place of >= - normally there is no reason to optimize these operations at all, but I can't output the code in Assembly to look at, neither this code can be benchmarked usefully
         getMicrosecondCountBuf[getMicrosecondCountI++] = GetMicrosecondCount() - getMicrosecondCountLast;
         if(getMicrosecondCountI > 19) {
             getMicrosecondCountI = 0;
@@ -297,7 +296,7 @@ void OnTimer()
 }
 //+------------------------------------------------------------------+
 // Calculation function
-// Fixed Issue: Week Range is not updated on a closed market, when opening the platform from fresh boot, because iLow() and iHigh() return wrong data (0.0) - this is one of the issues with MT5 parallel loading of background chart data (I love parallelism, but only when I have control of it, or atleast know its state).
+// Fixed Issue: Week Range is not updated on a closed market, when opening the platform from fresh boot, because iLow() and iHigh() return wrong data (0.0) - this is one of the issues with MT5 parallel loading of background chart data (I love parallelism, but only when I have control of it, or at least know its state).
 //  Fixed by: making statsUpdate() independent and called at onTimer()
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total,
@@ -311,7 +310,7 @@ int OnCalculate(const int rates_total,
                 const long& volume[],
                 const int& spread[])
 {
-    if(!oStatsShow || (rates_total <= 2)) { // No need to calculate if the data is less than the minimum operational period, or oStatsShow is false - it is returned as 0, because we want the terminal to interpret that we still need to calculate (performance cost is likely unmensurable)
+    if(!oStatsShow || (rates_total <= 2)) { // No need to calculate if the data is less than the minimum operational period, or oStatsShow is false - it is returned as 0, because we want the terminal to interpret that we still need to calculate (performance cost is likely unmensurable, or maybe the same as returning any value at all)
         return 0;
     }
     statsUpdate();
@@ -324,7 +323,7 @@ int OnCalculate(const int rates_total,
 void statsUpdate()
 {
     last = TimeGMT();
-    ulong m = (ulong) (((iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()) < 0) ? 0 : (iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeCurrent()));
+    ulong m = (ulong) (((iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeTradeServer()) < 0) ? 0 : (iTime(Symbol(), PERIOD_CURRENT, 0) + PeriodSeconds(PERIOD_CURRENT) - TimeTradeServer()));
     ulong s = m % 60;
     m = (m - s) / 60;
     if(sFormat == kSFormatFirst) {
@@ -341,7 +340,10 @@ void statsUpdate()
                         IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) +
                         (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") +
                         ") " +
-                        (((SymbolInfoInteger(Symbol(), SYMBOL_TIME) < (TimeCurrent() - oStatsShowMktClosedTimer)) && oStatsShowMktClosed && TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Mkt Closed" :
+                        ((
+                             (
+                                 (SymbolInfoInteger(Symbol(), SYMBOL_TIME) < (TimeCurrent() - oStatsShowMktClosedTimer)) || (oStatsShowMktClosedTimer < (TimeTradeServer() - TimeCurrent()))
+                             ) && oStatsShowMktClosed && TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Mkt Closed" :
                          (oStatsShowMktClosed && !TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Disconnected" : (
                              (m < 10 ? "0" : "") +
                              IntegerToString((m < 0 ? 0 : m)) +
@@ -363,7 +365,10 @@ void statsUpdate()
                         IntegerToString(SymbolInfoInteger(Symbol(), SYMBOL_SPREAD)) +
                         (SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 10 ? "..." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 100 ? ".." : SymbolInfoInteger(Symbol(), SYMBOL_SPREAD) < 1000 ? "." : "") +
                         ") " +
-                        (((SymbolInfoInteger(Symbol(), SYMBOL_TIME) < (TimeCurrent() - oStatsShowMktClosedTimer)) && oStatsShowMktClosed && TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Mkt Closed" :
+                        ((
+                             (
+                                 (SymbolInfoInteger(Symbol(), SYMBOL_TIME) < (TimeCurrent() - oStatsShowMktClosedTimer)) || (oStatsShowMktClosedTimer < (TimeTradeServer() - TimeCurrent()))
+                             ) && oStatsShowMktClosed && TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Mkt Closed" :
                          (oStatsShowMktClosed && !TerminalInfoInteger(TERMINAL_CONNECTED)) ? "Disconnected" : (
                              (m < 10 ? "0" : "") +
                              IntegerToString((m < 0 ? 0 : m)) +
@@ -408,13 +413,13 @@ string TimeGMTOffset(long t = 0)
 //+------------------------------------------------------------------+
 int EnumToInt(DateFormat e)
 {
-    if(e == kTimeSeconds) {
+    if(e == kDateFormatSeconds) {
         return TIME_SECONDS;
-    } else if(e == kTimeMinutes) {
+    } else if(e == kDateFormatMinutes) {
         return TIME_MINUTES;
-    } else if(e == kTimeDateSeconds) {
+    } else if(e == kDateFormatDateSeconds) {
         return TIME_DATE | TIME_SECONDS;
-    } else if(e == kTimeDateMinutes) {
+    } else if(e == kDateFormatDateMinutes) {
         return TIME_DATE | TIME_MINUTES;
     }
     return -1;
